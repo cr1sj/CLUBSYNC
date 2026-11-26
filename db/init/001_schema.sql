@@ -3,6 +3,7 @@ CREATE TABLE users(id SERIAL PRIMARY KEY, name TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('admin','estudiante')));
 CREATE TABLE rooms(id SERIAL PRIMARY KEY, name TEXT UNIQUE NOT NULL, capacity INT NOT NULL);
 CREATE TABLE clubs(id SERIAL PRIMARY KEY, name TEXT NOT NULL, capacity INT NOT NULL);
+CREATE UNIQUE INDEX clubs_name_unique ON clubs (lower(name));
 CREATE TABLE assignments(id SERIAL PRIMARY KEY,
   club_id INT UNIQUE NOT NULL REFERENCES clubs(id),
   room_id INT NOT NULL REFERENCES rooms(id),
