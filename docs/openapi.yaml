@@ -1,15 +1,17 @@
 openapi: 3.0.3
 info:
   title: API de ClubSync
-  version: 1.0.0
+  version: 1.1.0
   description: >-
     Contrato HTTP de ClubSync, sistema de gestion de clubes extracurriculares.
-    El administrador asigna horario y aula a los clubes y gestiona encuestas
-    de horario. Los estudiantes votan en las encuestas y se inscriben a los clubes.
+    El administrador crea clubes y aulas, asigna horario y aula a los clubes y
+    gestiona encuestas de horario. Los estudiantes votan en las encuestas y se
+    inscriben a los clubes. La interfaz web se sirve en la raiz del servidor.
 servers:
   - url: http://localhost:3000
 tags:
   - name: Autenticacion
+  - name: Catalogo
   - name: Asignaciones
   - name: Encuestas
   - name: Inscripciones
@@ -70,6 +72,102 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
               example:
                 error: Credenciales incorrectas.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/clubs:
+    get:
+      tags: [Catalogo]
+      operationId: listClubs
+      summary: Consultar los clubes
+      responses:
+        '200':
+          description: Lista de clubes ordenada por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Catalogo]
+      operationId: createClub
+      summary: Crear un club
+      description: Solo administrador.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCatalogItem'
+      responses:
+        '201':
+          description: Club creado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/rooms:
+    get:
+      tags: [Catalogo]
+      operationId: listRooms
+      summary: Consultar las aulas
+      responses:
+        '200':
+          description: Lista de aulas ordenada por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CatalogItem'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Catalogo]
+      operationId: createRoom
+      summary: Crear un aula
+      description: Solo administrador. El nombre del aula debe ser unico.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCatalogItem'
+      responses:
+        '201':
+          description: Aula creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Ya existe un aula con ese nombre.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Ya existe un aula con ese nombre.
         '500':
           $ref: '#/components/responses/InternalError'
   /api/assignments:
@@ -135,7 +233,38 @@ paths:
                 error: El aula está ocupada en ese horario o el club ya tiene asignación.
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/schedule:
+    get:
+      tags: [Asignaciones]
+      operationId: listSchedule
+      summary: Consultar el horario publicado con nombres de club y aula
+      responses:
+        '200':
+          description: Horario ordenado por dia y hora.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScheduleItem'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/surveys:
+    get:
+      tags: [Encuestas]
+      operationId: listSurveys
+      summary: Consultar las encuestas con sus opciones y votos
+      responses:
+        '200':
+          description: Encuestas ordenadas de la mas reciente a la mas antigua.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SurveyListItem'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       tags: [Encuestas]
       operationId: createSurvey
@@ -406,6 +535,46 @@ components:
         role:
           type: string
           enum: [admin, estudiante]
+    NewCatalogItem:
+      type: object
+      required: [name, capacity]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+          example: Club de Robotica
+        capacity:
+          type: integer
+          minimum: 1
+          maximum: 500
+          example: 20
+    CatalogItem:
+      allOf:
+        - $ref: '#/components/schemas/NewCatalogItem'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              example: 1
+    ScheduleItem:
+      type: object
+      required: [id, clubName, roomName, dayOfWeek, startHour]
+      properties:
+        id:
+          type: integer
+        clubName:
+          type: string
+        roomName:
+          type: string
+        dayOfWeek:
+          type: integer
+          minimum: 1
+          maximum: 7
+        startHour:
+          type: integer
+          minimum: 7
+          maximum: 21
     NewAssignment:
       type: object
       required: [clubId, roomId, dayOfWeek, startHour]
@@ -492,6 +661,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/SurveyOption'
+    SurveyListItem:
+      type: object
+      required: [id, clubId, clubName, closesAt, status, options]
+      properties:
+        id:
+          type: integer
+        clubId:
+          type: integer
+        clubName:
+          type: string
+        closesAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [abierta, cerrada]
+        options:
+          type: array
+          items:
+            type: object
+            required: [id, dayOfWeek, startHour, votes]
+            properties:
+              id:
+                type: integer
+              dayOfWeek:
+                type: integer
+              startHour:
+                type: integer
+              votes:
+                type: integer
     VoteRequest:
       type: object
       required: [optionId]
