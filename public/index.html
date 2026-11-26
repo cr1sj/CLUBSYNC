@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClubSync</title>
+<style>
+  body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:0;background:#f4f6fa;color:#1d2433}
+  header{background:#1f3a5f;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center}
+  main{max-width:1000px;margin:20px auto;padding:0 16px}
+  section{background:#fff;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+  h2{margin-top:0;font-size:1.1rem;color:#1f3a5f}
+  label{display:block;margin:8px 0 2px;font-size:.85rem}
+  input,select,button{padding:7px 9px;font-size:.95rem;border:1px solid #b9c2d3;border-radius:5px}
+  button{background:#1f3a5f;color:#fff;cursor:pointer;border:0}
+  button.sec{background:#5b6b86}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th,td{border-bottom:1px solid #e3e8f0;padding:6px;text-align:left;font-size:.9rem}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+  #msg{position:sticky;top:0;z-index:5;padding:10px 14px;border-radius:6px;margin-bottom:12px;display:none}
+  .ok{background:#d9f2e3;color:#145a32}.err{background:#fde2e1;color:#7b1d1a}
+  .hidden{display:none}
+  .opt{display:flex;gap:8px;margin:4px 0}
+  .survey{border:1px solid #e3e8f0;border-radius:6px;padding:10px;margin-top:10px}
+</style>
+</head>
+<body>
+<header>
+  <strong>ClubSync · Gestión de clubes extracurriculares</strong>
+  <span><span id="who"></span> <button id="logoutBtn" class="sec hidden">Cerrar sesión</button></span>
+</header>
+<main>
+  <div id="msg"></div>
+
+  <section id="authBox">
+    <h2>Acceso</h2>
+    <div class="row">
+      <div><label>Correo</label><input id="email" type="email" placeholder="admin@test.com"></div>
+      <div><label>Contraseña</label><input id="password" type="password"></div>
+      <button id="loginBtn">Iniciar sesión</button>
+    </div>
+    <h2 style="margin-top:18px">Registro</h2>
+    <div class="row">
+      <div><label>Nombre</label><input id="name"></div>
+      <div><label>Rol</label>
+        <select id="role"><option value="estudiante">Estudiante</option><option value="admin">Administrador (solo demostración)</option></select></div>
+      <button id="registerBtn" class="sec">Registrarme</button>
+    </div>
+    <p style="font-size:.8rem">Para registrarse use el correo y la contraseña de arriba (mínimo 6 caracteres).</p>
+  </section>
+
+  <div id="appBox" class="hidden">
+
+    <section class="admin-only hidden">
+      <h2>Clubes y aulas</h2>
+      <form id="formClub" class="row">
+        <div><label>Nombre del club</label><input id="cName" required></div>
+        <div><label>Cupo</label><input id="cCap" type="number" min="1" max="500" value="20" required></div>
+        <button>Crear club</button>
+      </form>
+      <form id="formRoom" class="row">
+        <div><label>Nombre del aula</label><input id="rName" required></div>
+        <div><label>Capacidad</label><input id="rCap" type="number" min="1" max="500" value="30" required></div>
+        <button>Crear aula</button>
+      </form>
+    </section>
+
+    <section class="admin-only hidden">
+      <h2>Asignar horario y aula</h2>
+      <form id="formAssign" class="row">
+        <div><label>Club</label><select id="asClub"></select></div>
+        <div><label>Aula</label><select id="asRoom"></select></div>
+        <div><label>Día</label><select id="asDay"></select></div>
+        <div><label>Hora</label><select id="asHour"></select></div>
+        <button>Asignar</button>
+      </form>
+    </section>
+
+    <section class="admin-only hidden">
+      <h2>Crear encuesta de horario</h2>
+      <form id="formSurvey">
+        <div class="row">
+          <div><label>Club</label><select id="svClub"></select></div>
+          <div><label>Cierra el</label><input id="svCloses" type="datetime-local" required></div>
+          <button type="button" id="addOpt" class="sec">+ Opción</button>
+          <button>Crear encuesta</button>
+        </div>
+        <div id="svOptions"></div>
+      </form>
+    </section>
+
+    <section>
+      <h2>Clubes</h2>
+      <table><thead><tr><th>ID</th><th>Club</th><th>Cupo</th><th></th></tr></thead><tbody id="clubsBody"></tbody></table>
+    </section>
+
+    <section class="admin-only hidden">
+      <h2>Aulas</h2>
+      <table><thead><tr><th>ID</th><th>Aula</th><th>Capacidad</th></tr></thead><tbody id="roomsBody"></tbody></table>
+    </section>
+
+    <section>
+      <h2>Horario publicado</h2>
+      <table><thead><tr><th>Club</th><th>Aula</th><th>Día</th><th>Hora</th></tr></thead><tbody id="scheduleBody"></tbody></table>
+    </section>
+
+    <section>
+      <h2>Encuestas de horario</h2>
+      <div id="surveys"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const DAYS = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let session = JSON.parse(localStorage.getItem('clubsync') || 'null');
+let state = { clubs: [], rooms: [], schedule: [], surveys: [] };
+
+function show(text, ok) { const m = $('msg'); m.textContent = text; m.className = ok ? 'ok' : 'err'; m.style.display = 'block'; }
+function logout() { session = null; localStorage.removeItem('clubsync'); render(); }
+function fail(e) {
+  if (e.status === 401 && session) { logout(); show('La sesión venció o no es válida. Inicie sesión de nuevo.', false); return; }
+  show(`${e.status || ''} ${e.message}`.trim(), false);
+}
+
+async function api(path, method = 'GET', body) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (session) headers.Authorization = 'Bearer ' + session.token;
+  const res = await fetch('/api' + path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  let data = null; try { data = await res.json(); } catch { /* sin cuerpo */ }
+  if (!res.ok) throw Object.assign(new Error((data && data.error) || 'Error ' + res.status), { status: res.status });
+  return data;
+}
+async function run(fn, okMsg) {
+  try { const r = await fn(); if (okMsg) show(okMsg, true); return r || true; } catch (e) { fail(e); }
+}
+
+const opts = (list, label) => list.map((x) => `<option value="${x.id}">${esc(label(x))}</option>`).join('');
+const dayOptions = () => DAYS.slice(1).map((d, i) => `<option value="${i + 1}">${d}</option>`).join('');
+const hourOptions = () => { let h = ''; for (let i = 7; i <= 21; i++) h += `<option value="${i}">${i}:00</option>`; return h; };
+
+function addOption() {
+  const div = document.createElement('div'); div.className = 'opt';
+  div.innerHTML = `<select class="od">${dayOptions()}</select><select class="oh">${hourOptions()}</select>`;
+  $('svOptions').appendChild(div);
+}
+
+async function refresh() {
+  const r = await run(async () => {
+    const [clubs, rooms, schedule, surveys] = await Promise.all([api('/clubs'), api('/rooms'), api('/schedule'), api('/surveys')]);
+    state = { clubs, rooms, schedule, surveys };
+    return true;
+  });
+  if (r) paint();
+}
+
+function paint() {
+  const isStudent = session.role === 'estudiante', isAdmin = session.role === 'admin';
+  $('clubsBody').innerHTML = state.clubs.map((c) =>
+    `<tr><td>${c.id}</td><td>${esc(c.name)}</td><td>${c.capacity}</td><td>${isStudent ? `<button data-action="enroll" data-id="${c.id}">Inscribirme</button>` : ''}</td></tr>`).join('');
+  $('roomsBody').innerHTML = state.rooms.map((r) => `<tr><td>${r.id}</td><td>${esc(r.name)}</td><td>${r.capacity}</td></tr>`).join('');
+  $('scheduleBody').innerHTML = state.schedule.map((s) =>
+    `<tr><td>${esc(s.clubName)}</td><td>${esc(s.roomName)}</td><td>${DAYS[s.dayOfWeek]}</td><td>${s.startHour}:00</td></tr>`).join('') || '<tr><td colspan="4">Aún no hay horarios asignados.</td></tr>';
+  const club = $('asClub').value, room = $('asRoom').value, sv = $('svClub').value;
+  $('asClub').innerHTML = opts(state.clubs, (c) => c.name); $('svClub').innerHTML = opts(state.clubs, (c) => c.name);
+  $('asRoom').innerHTML = opts(state.rooms, (r) => `${r.name} (${r.capacity})`);
+  if (club) $('asClub').value = club; if (room) $('asRoom').value = room; if (sv) $('svClub').value = sv;
+  $('surveys').innerHTML = state.surveys.map((s) => {
+    const open = s.status === 'abierta';
+    const rows = s.options.map((o) =>
+      `<tr><td>Opción ${o.id}</td><td>${DAYS[o.dayOfWeek]} ${o.startHour}:00</td><td>${o.votes} votos</td><td>${open && isStudent ? `<button data-action="vote" data-id="${s.id}" data-option="${o.id}">Votar</button>` : ''}</td></tr>`).join('');
+    return `<div class="survey"><b>Encuesta #${s.id} · ${esc(s.clubName)}</b> — ${esc(s.status)} · cierra ${esc(new Date(s.closesAt).toLocaleString())}
+      <table><tbody>${rows}</tbody></table>${open && isAdmin ? `<p><button class="sec" data-action="close" data-id="${s.id}">Cerrar encuesta</button></p>` : ''}</div>`;
+  }).join('') || '<p>No hay encuestas.</p>';
+}
+
+function render() {
+  const logged = !!session;
+  $('authBox').classList.toggle('hidden', logged);
+  $('appBox').classList.toggle('hidden', !logged);
+  $('logoutBtn').classList.toggle('hidden', !logged);
+  $('who').textContent = logged ? `${session.email} (${session.role})` : '';
+  document.querySelectorAll('.admin-only').forEach((el) => el.classList.toggle('hidden', !(logged && session.role === 'admin')));
+  if (logged) refresh();
+}
+
+async function closeSurvey(id, optionId) {
+  try {
+    const r = await api(`/surveys/${id}/close`, 'POST', optionId ? { optionId } : {});
+    show(`Encuesta cerrada. Horario ganador: ${DAYS[r.winner.dayOfWeek]} ${r.winner.startHour}:00. Ahora puede asignarlo en "Asignar horario y aula".`, true);
+    await refresh();
+  } catch (e) {
+    if (e.status === 409 && /empate/i.test(e.message)) {
+      const v = prompt('Hay empate. Escriba el número de la opción ganadora:');
+      if (v) return closeSurvey(id, Number(v));
+    }
+    fail(e);
+  }
+}
+
+$('loginBtn').addEventListener('click', async () => {
+  const email = $('email').value;
+  const r = await run(() => api('/auth/login', 'POST', { email, password: $('password').value }));
+  if (r && r !== true) { session = { token: r.token, role: r.role, email }; localStorage.setItem('clubsync', JSON.stringify(session)); show('Sesión iniciada.', true); render(); }
+});
+$('registerBtn').addEventListener('click', () =>
+  run(() => api('/auth/register', 'POST', { name: $('name').value, email: $('email').value, password: $('password').value, role: $('role').value }), 'Usuario registrado. Ahora inicie sesión.'));
+$('logoutBtn').addEventListener('click', logout);
+$('addOpt').addEventListener('click', addOption);
+
+$('formClub').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (await run(() => api('/clubs', 'POST', { name: $('cName').value, capacity: Number($('cCap').value) }), 'Club creado.')) { $('cName').value = ''; refresh(); }
+});
+$('formRoom').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (await run(() => api('/rooms', 'POST', { name: $('rName').value, capacity: Number($('rCap').value) }), 'Aula creada.')) { $('rName').value = ''; refresh(); }
+});
+$('formAssign').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = { clubId: Number($('asClub').value), roomId: Number($('asRoom').value), dayOfWeek: Number($('asDay').value), startHour: Number($('asHour').value) };
+  if (await run(() => api('/assignments', 'POST', body), 'Horario y aula asignados.')) refresh();
+});
+$('formSurvey').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const options = [...document.querySelectorAll('#svOptions .opt')].map((d) => ({ dayOfWeek: Number(d.querySelector('.od').value), startHour: Number(d.querySelector('.oh').value) }));
+  const body = { clubId: Number($('svClub').value), closesAt: new Date($('svCloses').value).toISOString(), options };
+  if (await run(() => api('/surveys', 'POST', body), 'Encuesta creada.')) { $('svOptions').innerHTML = ''; addOption(); addOption(); refresh(); }
+});
+
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button[data-action]'); if (!b) return;
+  const id = Number(b.dataset.id);
+  if (b.dataset.action === 'enroll' && await run(() => api(`/clubs/${id}/enrollments`, 'POST'), 'Inscripción registrada.')) refresh();
+  if (b.dataset.action === 'vote' && await run(() => api(`/surveys/${id}/votes`, 'POST', { optionId: Number(b.dataset.option) }), 'Voto registrado.')) refresh();
+  if (b.dataset.action === 'close') closeSurvey(id);
+});
+
+$('asDay').innerHTML = dayOptions(); $('asHour').innerHTML = hourOptions();
+addOption(); addOption();
+render();
+</script>
+</body>
+</html>
