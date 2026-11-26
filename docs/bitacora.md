@@ -64,7 +64,7 @@ Docente: Ing. Francois Fernandez.
 | 8 | 25/11/2026 | Pruebas automatizadas (QA-01, QA-02, QA-07; CS-01 a CS-05) | `tests/CreateAssignmentService.test.ts`, `tests/PostgresAssignmentRepository.test.ts`, `tests/SurveyAndEnrollment.test.ts`, `tests/AuthService.test.ts`, `tests/ClubSyncApi.test.ts`; se reemplazan las pruebas de reservas de la plantilla | `npm test`, `npm run build` | 5 archivos y 36 pruebas aprobadas; `tsc` compila sin errores | Prueba del contrato OpenAPI |
 | 9 | 25/11/2026 | Contrato de API | `docs/openapi.yaml` reescrito para ClubSync; `tests/OpenAPI.test.ts` | Validación en Swagger Editor sin errores; `GET /openapi.yaml` devuelve el documento nuevo | Contrato alineado con la implementación; 46 pruebas en 6 archivos | Actualizarlo ante cambios |
 | 10 | 25/11/2026 | Documentación y limpieza | `README.md`, `docs/arquitectura.md`, `docs/contexto.md`, `.env.example`, `package.json`; se eliminan archivos de la plantilla | Revisión manual; `npm test` y `npm run build` | Documentación completa | Mantenerla actualizada |
-| 11 | 25/11/2026 | CS-06 Gestionar clubes y aulas; interfaz web solicitada por el docente | `domain/catalog.ts`, `domain/surveyQuery.ts`, `application/CatalogService.ts`, `application/ListSurveysService.ts`, `persistence/PostgresCatalogRepository.ts`, `persistence/PostgresSurveyQueryRepository.ts`, `presentation/CatalogController.ts`, `presentation/catalogRoutes.ts`, `public/index.html`, `app.ts`, `docs/openapi.yaml` (v1.1.0), `tests/CatalogService.test.ts` | `npm test` (50 pruebas en 7 archivos), `npm run build`, Swagger Editor, recorrido manual de la interfaz | Interfaz funcionando con ambos roles; clubes y aulas creados con nombre; contrato actualizado | Capturas de la interfaz (UI-01 a UI-04) |
+| 11 | 25/11/2026 | CS-06 Gestionar clubes y aulas; interfaz web solicitada por el docente | `domain/catalog.ts`, `domain/surveyQuery.ts`, `application/CatalogService.ts`, `application/ListSurveyService.ts`, `persistence/PostgresCatalogRepository.ts`, `persistence/PostgresSurveyQueryRepository.ts`, `presentation/CatalogController.ts`, `presentation/catalogRoutes.ts`, `public/index.html`, `app.ts`, `docs/openapi.yaml` (v1.1.0), `tests/CatalogService.test.ts` | `npm test` (50 pruebas en 7 archivos), `npm run build`, Swagger Editor, recorrido manual de la interfaz | Interfaz funcionando con ambos roles; clubes y aulas creados con nombre; contrato actualizado | Capturas de la interfaz (UI-01 a UI-04) |
 
 ### Cambios y decisiones del ciclo de vida
 
@@ -106,4 +106,4 @@ Docente: Ing. Francois Fernandez.
 
 ## Declaración de herramientas
 
-Los códigos no fueron generados por Inteligencia Artificial, fueron tomados de ejercicios realizados en la asignatura de Desarrollo de Aplicaciones Web.
+Los códigos no fueron generados por Inteligencia Artificial, fueron tomados de ejercicios realizados en la asignatura de Desarrollo de Aplicaciones Web, por ejemplo los archivos de controllers, routes, y application.
