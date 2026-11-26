@@ -1,56 +1,317 @@
 openapi: 3.0.3
 info:
-  title: API didáctica de reservas
+  title: API de ClubSync
   version: 1.0.0
-  description: Contrato HTTP del ejemplo usado en la semana 5.
+  description: >-
+    Contrato HTTP de ClubSync, sistema de gestion de clubes extracurriculares.
+    El administrador asigna horario y aula a los clubes y gestiona encuestas
+    de horario. Los estudiantes votan en las encuestas y se inscriben a los clubes.
 servers:
   - url: http://localhost:3000
+tags:
+  - name: Autenticacion
+  - name: Asignaciones
+  - name: Encuestas
+  - name: Inscripciones
+  - name: Soporte
 paths:
-  /api/reservations:
-    get:
-      operationId: listReservations
-      summary: Consultar las reservas
-      responses:
-        '200':
-          description: Reservas ordenadas por fecha de inicio.
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Reservation'
-        '500':
-          $ref: '#/components/responses/InternalError'
+  /api/auth/register:
     post:
-      operationId: createReservation
-      summary: Crear una reserva
+      tags: [Autenticacion]
+      operationId: registerUser
+      summary: Registrar un usuario
+      description: >-
+        Crea un usuario. Si no se envia role se crea como estudiante.
+        El rol admin se permite solo en el entorno de desarrollo y demostracion.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateReservation'
+              $ref: '#/components/schemas/RegisterRequest'
       responses:
         '201':
-          description: Reserva creada.
+          description: Usuario creado.
           content:
             application/json:
               schema:
-                type: object
-                required: [data]
-                properties:
-                  data:
-                    $ref: '#/components/schemas/Reservation'
+                $ref: '#/components/schemas/UserResponse'
         '400':
-          $ref: '#/components/responses/InvalidInput'
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/auth/login:
+    post:
+      tags: [Autenticacion]
+      operationId: loginUser
+      summary: Iniciar sesion y obtener un token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciales validas. El token dura 2 horas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          description: Credenciales incorrectas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: Credenciales incorrectas.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/assignments:
+    get:
+      tags: [Asignaciones]
+      operationId: listAssignments
+      summary: Consultar las asignaciones de aula y horario
+      description: Devuelve las asignaciones ordenadas por dia de la semana y hora de inicio.
+      responses:
+        '200':
+          description: Lista de asignaciones.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Assignment'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags: [Asignaciones]
+      operationId: createAssignment
+      summary: Asignar horario y aula a un club (CS-01)
+      description: >-
+        Solo administrador. Un aula no puede tener dos clubes en el mismo bloque
+        horario (QA-01) y un club tiene una sola asignacion.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewAssignment'
+      responses:
+        '201':
+          description: Asignacion creada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assignment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El club o el aula no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: El club o el aula no existe.
+        '409':
+          description: El aula esta ocupada en ese horario o el club ya tiene asignacion.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: El aula está ocupada en ese horario o el club ya tiene asignación.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/surveys:
+    post:
+      tags: [Encuestas]
+      operationId: createSurvey
+      summary: Crear una encuesta de horario (CS-02)
+      description: Solo administrador. Requiere al menos 2 opciones y una fecha de cierre futura.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewSurvey'
+      responses:
+        '201':
+          description: Encuesta creada con sus opciones.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Survey'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El club no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/surveys/{id}/votes:
+    post:
+      tags: [Encuestas]
+      operationId: voteSurvey
+      summary: Votar en una encuesta (CS-03)
+      description: >-
+        Solo estudiante. Cada estudiante vota una sola vez por encuesta (QA-07)
+        y solo mientras la encuesta esta abierta.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+      responses:
+        '201':
+          description: Voto registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Voto registrado.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: La encuesta no existe o la opcion no pertenece a la encuesta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: El estudiante ya voto o la encuesta esta cerrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                votoRepetido:
+                  value:
+                    error: Ya votó en esta encuesta.
+                encuestaCerrada:
+                  value:
+                    error: La encuesta está cerrada.
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/surveys/{id}/close:
+    post:
+      tags: [Encuestas]
+      operationId: closeSurvey
+      summary: Cerrar una encuesta y decidir el horario ganador (CS-04)
+      description: >-
+        Solo administrador. Cierra la encuesta y devuelve la opcion mas votada.
+        Si hay empate se debe enviar optionId para que el administrador decida.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloseRequest'
+      responses:
+        '200':
+          description: Encuesta cerrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CloseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: La encuesta no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: La encuesta ya estaba cerrada o hay empate sin optionId.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/clubs/{id}/enrollments:
+    post:
+      tags: [Inscripciones]
+      operationId: enrollInClub
+      summary: Inscribirse a un club (CS-05)
+      description: >-
+        Solo estudiante. El club debe tener horario publicado y cupo disponible.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '201':
+          description: Inscripcion registrada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+              example:
+                message: Inscripción registrada.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: El club no existe.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Ya esta inscrito, el club no tiene cupo o no tiene horario publicado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '500':
           $ref: '#/components/responses/InternalError'
   /health:
     get:
+      tags: [Soporte]
       operationId: healthCheck
       summary: Comprobar que la API responde
       responses:
@@ -65,43 +326,215 @@ paths:
                   status:
                     type: string
                     enum: [ok]
+  /openapi.yaml:
+    get:
+      tags: [Soporte]
+      operationId: getOpenApiDocument
+      summary: Publicar este contrato
+      responses:
+        '200':
+          description: Documento OpenAPI en formato YAML.
+          content:
+            application/yaml:
+              schema:
+                type: string
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+        example: 1
   schemas:
-    CreateReservation:
+    RegisterRequest:
       type: object
-      additionalProperties: false
-      required: [customerName, resourceName, startsAt, endsAt]
+      required: [name, email, password]
       properties:
-        customerName:
+        name:
           type: string
-          minLength: 1
-          maxLength: 160
-          example: Ana Pérez
-        resourceName:
+          example: Estudiante Uno
+        email:
           type: string
-          minLength: 1
-          maxLength: 160
-          example: Sala A
-        startsAt:
+          format: email
+          example: estudiante1@test.com
+        password:
           type: string
-          format: date-time
-          example: '2026-11-10T14:00:00-05:00'
-        endsAt:
+          minLength: 6
+          example: '123456'
+        role:
           type: string
-          format: date-time
-          example: '2026-11-10T15:00:00-05:00'
-    Reservation:
+          enum: [admin, estudiante]
+          default: estudiante
+    UserResponse:
+      type: object
+      required: [id, name, email, role]
+      properties:
+        id:
+          type: integer
+          example: 2
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, estudiante]
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      required: [token, role]
+      properties:
+        token:
+          type: string
+          description: Token JWT para el encabezado Authorization Bearer.
+        role:
+          type: string
+          enum: [admin, estudiante]
+    NewAssignment:
+      type: object
+      required: [clubId, roomId, dayOfWeek, startHour]
+      properties:
+        clubId:
+          type: integer
+          example: 2
+        roomId:
+          type: integer
+          example: 2
+        dayOfWeek:
+          type: integer
+          minimum: 1
+          maximum: 7
+          description: Dia de la semana, de 1 a 7.
+          example: 3
+        startHour:
+          type: integer
+          minimum: 7
+          maximum: 21
+          description: Hora de inicio del bloque de una hora.
+          example: 9
+    Assignment:
       allOf:
-        - $ref: '#/components/schemas/CreateReservation'
+        - $ref: '#/components/schemas/NewAssignment'
         - type: object
-          required: [id, createdAt]
+          required: [id]
           properties:
             id:
-              type: string
-              format: uuid
-            createdAt:
-              type: string
-              format: date-time
+              type: integer
+              example: 3
+    SurveyOptionInput:
+      type: object
+      required: [dayOfWeek, startHour]
+      properties:
+        dayOfWeek:
+          type: integer
+          minimum: 1
+          maximum: 7
+        startHour:
+          type: integer
+          minimum: 7
+          maximum: 21
+    NewSurvey:
+      type: object
+      required: [clubId, closesAt, options]
+      properties:
+        clubId:
+          type: integer
+          example: 2
+        closesAt:
+          type: string
+          format: date-time
+          description: Fecha de cierre, debe ser futura.
+          example: '2026-12-31T23:00:00Z'
+        options:
+          type: array
+          minItems: 2
+          items:
+            $ref: '#/components/schemas/SurveyOptionInput'
+    SurveyOption:
+      allOf:
+        - $ref: '#/components/schemas/SurveyOptionInput'
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+    Survey:
+      type: object
+      required: [id, clubId, closesAt, status, options]
+      properties:
+        id:
+          type: integer
+        clubId:
+          type: integer
+        closesAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [abierta, cerrada]
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/SurveyOption'
+    VoteRequest:
+      type: object
+      required: [optionId]
+      properties:
+        optionId:
+          type: integer
+          example: 1
+    CloseRequest:
+      type: object
+      properties:
+        optionId:
+          type: integer
+          description: Opcion elegida por el administrador cuando hay empate.
+    OptionResult:
+      type: object
+      required: [optionId, dayOfWeek, startHour, votes]
+      properties:
+        optionId:
+          type: integer
+        dayOfWeek:
+          type: integer
+        startHour:
+          type: integer
+        votes:
+          type: integer
+    CloseResponse:
+      type: object
+      required: [surveyId, winner, results]
+      properties:
+        surveyId:
+          type: integer
+        winner:
+          $ref: '#/components/schemas/OptionResult'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OptionResult'
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
     ErrorResponse:
       type: object
       required: [error]
@@ -109,12 +542,38 @@ components:
         error:
           type: string
   responses:
-    InvalidInput:
-      description: Solicitud que no cumple el contrato o las reglas del intervalo.
+    BadRequest:
+      description: La solicitud no cumple el contrato o las reglas de validacion.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: dayOfWeek debe estar entre 1 y 7.
+    Unauthorized:
+      description: Falta el token o es invalido o esta vencido.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: No autenticado.
+    Forbidden:
+      description: El rol del usuario no tiene permiso para esta operacion.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: No tiene permiso para esta operación.
+    Conflict:
+      description: Conflicto con el estado actual de los datos.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: El email ya está registrado.
     InternalError:
       description: Error interno no expuesto al consumidor.
       content:
