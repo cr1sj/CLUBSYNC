@@ -41,12 +41,13 @@
     </div>
     <h2 style="margin-top:18px">Registro</h2>
     <div class="row">
-      <div><label>Nombre</label><input id="name"></div>
+      <div><label>Nombre</label><input id="regName"></div>
+      <div><label>Correo</label><input id="regEmail" type="email" placeholder="correo@ejemplo.com"></div>
+      <div><label>Contraseña</label><input id="regPassword" type="password" placeholder="mínimo 6 caracteres"></div>
       <div><label>Rol</label>
-        <select id="role"><option value="estudiante">Estudiante</option><option value="admin">Administrador (solo demostración)</option></select></div>
+        <select id="regRole"><option value="estudiante">Estudiante</option><option value="admin">Administrador (solo demostración)</option></select></div>
       <button id="registerBtn" class="sec">Registrarme</button>
     </div>
-    <p style="font-size:.8rem">Para registrarse use el correo y la contraseña de arriba (mínimo 6 caracteres).</p>
   </section>
 
   <div id="appBox" class="hidden">
@@ -205,8 +206,12 @@ $('loginBtn').addEventListener('click', async () => {
   const r = await run(() => api('/auth/login', 'POST', { email, password: $('password').value }));
   if (r && r !== true) { session = { token: r.token, role: r.role, email }; localStorage.setItem('clubsync', JSON.stringify(session)); show('Sesión iniciada.', true); render(); }
 });
-$('registerBtn').addEventListener('click', () =>
-  run(() => api('/auth/register', 'POST', { name: $('name').value, email: $('email').value, password: $('password').value, role: $('role').value }), 'Usuario registrado. Ahora inicie sesión.'));
+$('registerBtn').addEventListener('click', async () => {
+  const ok = await run(() => api('/auth/register', 'POST', {
+    name: $('regName').value, email: $('regEmail').value,
+    password: $('regPassword').value, role: $('regRole').value }), 'Usuario registrado. Ahora inicie sesión.');
+  if (ok) { $('email').value = $('regEmail').value; $('regName').value = ''; $('regEmail').value = ''; $('regPassword').value = ''; }
+});
 $('logoutBtn').addEventListener('click', logout);
 $('addOpt').addEventListener('click', addOption);
 
